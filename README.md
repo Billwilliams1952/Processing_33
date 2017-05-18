@@ -16,5 +16,5 @@ The sketch provides multiple simulations illustrating autonomous steering behavi
 
 ## SuperShape
 
-Inspired by Paul Bourke's work with supershapes found at http://paulbourke.net/geometry/supershape/
+Inspired by Paul Bourke's work with supershapes found at http://paulbourke.net/geometry/supershape/ and http://paulbourke.net/geometry/superellipse/
 

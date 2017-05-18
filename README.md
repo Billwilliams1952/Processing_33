@@ -1,5 +1,5 @@
 # Processing_33
-Processing sketches
+Processing sketches.  My learning curve using a new development environment (Processing) and programming language (Java).
 
 From: https://processing.org/
 

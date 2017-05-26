@@ -1,3 +1,17 @@
+/*
+    Steering Behaviors
+    
+    This program is free software: you can redistribute it and/or modify it under
+    the terms of the GNU General Public License as published by the Free Software
+    Foundation, either version 3 of the License, or (at your option) any later 
+    version. This program is distributed in the hope that it will be useful, but 
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more 
+    details. You should have received a copy of the GNU General Public License 
+    along with this program. If not, see http://www.gnu.org/licenses/.
+    
+    Bill Williams - 2017
+*/
 
 public class PathFollowerSim extends Simulation {
   static final int MAX_VEHICLES = 500;
@@ -54,16 +68,36 @@ public class PathFollowerSim extends Simulation {
   public void keyEvent ( KeyEvent event ) { }
   
   void CreatePanel() {
-    thisControlPanel = new Panel("Path Follower", new PVector(250,20), 230, 375, 
+    thisControlPanel = new Panel("Path Follower", new PVector(250,0), 230, 375, 
             color(0,0,255,100)); //color(255,130,190,150)); 
     float size = thisControlPanel.AddScrollbar ( 1, "Number of Path Followers", 1, 
                                                  MAX_VEHICLES, 5, 0);
     thisControlPanel.SetValue(1,200,0);
+    thisControlPanel.SetHint(1,increaseSizeHint); 
+
+    thisControlPanel.AddScrollbar ( 2, "Velocity", 1, 
+                                                 10, 5, size);
+    thisControlPanel.SetValue(2,Mover.MAX_FOLLOW_PATH_VELOCITY,2);
+    thisControlPanel.SetHint(2,"Adjust path follow maximum velocity"); 
+    thisControlPanel.AddScrollbar ( 3, "Max Force", 0.1, 
+                                                 5, 5, 2*size);
+    thisControlPanel.SetValue(3,Mover.MAX_FOLLOW_PATH_FORCE,2);
+    thisControlPanel.SetHint(3,"Adjust path follow maximum force"); 
+    thisControlPanel.AddScrollbar ( 4, "Lookahead Distance", 10, 
+                                                 100, 5, 3*size);
+    thisControlPanel.SetValue(4,Mover.FOLLOW_PATH_LOOK_AHEAD,0);
+    thisControlPanel.SetHint(4,"Adjust path follow lookahead distance"); 
+    thisControlPanel.AddScrollbar ( 5, "Path Radius", 10, 
+                                                 100, 5, 4*size);
+    thisControlPanel.SetValue(5,Mover.FOLLOW_PATH_RADIUS,0);
+    thisControlPanel.SetHint(5,"Adjust path size. While within the path, do not calculate new heading"); 
     
     thisControlPanel.AddButton(10,"Save Path/Save Path",0,200,color(0,255,255),color(255,255,150));
-    thisControlPanel.SetBooleanValue(6,false);
-        thisControlPanel.AddButton(20,"Load Path/Load Path",120,200,color(0,255,255),color(255,255,150));
+    thisControlPanel.SetBooleanValue(10,false);
+    thisControlPanel.SetHint(10,"Save the path points to an external file");
+    thisControlPanel.AddButton(20,"Load Path/Load Path",120,200,color(0,255,255),color(255,255,150));
     thisControlPanel.SetBooleanValue(20,false);
+    thisControlPanel.SetHint(20,"Load the path points from an external file");
   }
   
   void Resize() {
@@ -112,6 +146,7 @@ public class PathFollowerSim extends Simulation {
   
   void Run() {
     background(0);
+    Title("Path Following",color(255,255,255,100));
     
     // Check Buttons
     if ( thisControlPanel.GetBooleanValue(10) ) {
@@ -128,12 +163,13 @@ public class PathFollowerSim extends Simulation {
     UpdateObstaclesAndBadguys();
     
     CreatePathFollowers();
-      
+    
     for ( Mover follower : pathFollowers ) {
-      follower.FollowPath(pathToFollow);
+      follower.FollowPath(pathToFollow,thisControlPanel.GetIntegerValue(4),
+                          thisControlPanel.GetIntegerValue(5),
+                          thisControlPanel.GetValue(2),thisControlPanel.GetValue(3));
       follower.Separation(pathFollowers);
-      follower.AvoidObstacles(obstacles);
-      follower.Flee(badGuys);
+      DoObstaclesAndBadGuys(follower);
       follower.Update();
       follower.Show();
     }
@@ -377,6 +413,7 @@ public class PathToFollow {
   void Show () {   
     stroke(255,255,0,150);
     strokeWeight(2); 
+    textSize(12);
     
     // Draw the path specified by the points
     rectMode(CORNER);
@@ -410,7 +447,7 @@ public class PathToFollow {
       rect(pt.x,pt.y,POINT_CAPTURE_SIZE*2,POINT_CAPTURE_SIZE*2);
       rectMode(CORNER);
 
-     // HintMessage("Left-Drag to Move Point, Shift+Left-Click to Delete point");
+     hintMessage = "Left-Drag to Move Point, Shift+Left-Click to Delete point";
     }
     
     if ( addLegInfo.legIndex != -1 ) {
@@ -433,7 +470,7 @@ public class PathToFollow {
         rectMode(CORNER);
       popMatrix();
       
-      //HintMessage("Shift+Left-Click to Add a New Point");
+      hintMessage = "Shift+Left-Click to Add a New Point";
     }
   }
 }

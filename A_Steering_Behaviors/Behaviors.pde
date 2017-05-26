@@ -1,17 +1,33 @@
+/*
+    Steering Behaviors
+    
+    This program is free software: you can redistribute it and/or modify it under
+    the terms of the GNU General Public License as published by the Free Software
+    Foundation, either version 3 of the License, or (at your option) any later 
+    version. This program is distributed in the hope that it will be useful, but 
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more 
+    details. You should have received a copy of the GNU General Public License 
+    along with this program. If not, see http://www.gnu.org/licenses/.
+    
+    Bill Williams - 2017
+*/
 
 // Hack to allow me to declare static variables that I can change
 abstract static class BehaviorsBase {
   static protected boolean DO_UPDATES = true;
   static protected boolean SHOW_VECTORS = true;
+  static public boolean drawAsPoint = false;
   
   public static void EnableUpdates ( boolean enable ) { DO_UPDATES = enable; }
   public static void EnableVectors ( boolean enable ) { SHOW_VECTORS = enable; } 
 }
 
-abstract class Mover extends BehaviorsBase {
+class Mover extends BehaviorsBase {
   // Common values for all behaviors.  These can be overriden by calling the 
   // particular behavior method with the parameters.
   final static float MAX_VELOCITY = 3;
+  final static float MINIMUM_VELOCITY = 3;
   final static float MIN_RADIUS = 15, MAX_RADIUS = 30;
   final static float MAX_ALIGNMENT_DISTANCE = 50;
   final static float MAX_ALIGNMENT_VELOCITY = 3;
@@ -19,7 +35,7 @@ abstract class Mover extends BehaviorsBase {
   final static float MAX_COHESION_DISTANCE = 35;
   final static float MAX_COHESION_VELOCITY = 4;
   final static float MAX_COHESION_FORCE = 0.20;
-  final static float MAX_COLLISION_VELOCITY = 3;
+  final static float MAX_COLLISION_VELOCITY = 10;
   final static float COLLISION_CR = 1.0;         // perfectly elastic
   final static float MIN_FLEE_DISTANCE = 100;    // Look farther out for badGuys
   final static float MAX_FLEE_VELOCITY = 6;
@@ -54,13 +70,12 @@ abstract class Mover extends BehaviorsBase {
   PVector acc;
   float   radius; 
   float   mass;
-  boolean useMass = false, withinRadius = false, withinSeparation = false;
+  boolean useMass = false, withinRadius = false, withinSeparation = false,
+          collide = false;
   color   clr;        // What color is this object??
   float   noiseOff = 0.1, noiseInc = 0.005;    // Used by Perlin Noise in Wander
   Panel   controlPanel;
   
-  abstract void Show ();    // Each derived class implements its own show
-
   Mover (color clr) {
     this(floor(random(MIN_RADIUS,MAX_RADIUS)),clr);
   }
@@ -73,6 +88,28 @@ abstract class Mover extends BehaviorsBase {
     acc = new PVector(0,0);  
     mass = radius;
   }
+
+void Show () {
+  fill(clr);  
+  if ( drawAsPoint ) {
+    strokeWeight(6);
+    stroke(clr);
+    point(pos.x,pos.y);
+    strokeWeight(1);
+  } else { 
+    pushMatrix();
+      // Drawing vehicle and collision graphics relative to its position
+      translate(pos.x,pos.y);
+      rotate(vel.heading());
+      stroke(255);
+      beginShape();
+        vertex(-radius,-radius);
+        vertex(-radius,radius); 
+        vertex(radius*2,0);
+      endShape(CLOSE); 
+    popMatrix(); 
+  }
+}
 
   void AddForce ( PVector force ) {
     if ( ! DO_UPDATES ) return;
@@ -117,11 +154,21 @@ abstract class Mover extends BehaviorsBase {
   void Update () {
     if ( ! DO_UPDATES ) return;
     
-    vel.add(acc);
+    vel.add(acc);  
     pos.add(vel);
     acc.set(0,0);
     Edges();
-  }  
+  } 
+  
+  void Update ( float minimumVelocity ) {
+    if ( ! DO_UPDATES ) return;
+    
+    vel.add(acc);
+    if ( vel.mag() < minimumVelocity ) vel.setMag(minimumVelocity);   
+    pos.add(vel);
+    acc.set(0,0);
+    Edges();
+  }
   
   void Edges() {
     if ( pos.x > width ) pos.x = 0;
@@ -154,7 +201,7 @@ abstract class Mover extends BehaviorsBase {
   void Alignment ( ArrayList<Mover> others, float maxDist, float maxVelocity, 
                   float maxForce ) {
     // Include my heading in the calculation?  YES!! NO??
-    PVector averageAlignmentHeadingVector = vel.normalize(null);
+    PVector averageAlignmentHeadingVector = new PVector(0,0); //vel.normalize(null);
     int count = 0;
     
     for ( Mover other : others ) {
@@ -313,11 +360,10 @@ abstract class Mover extends BehaviorsBase {
   
   void Collision ( ArrayList<Mover> others, float maxVelocity, float Cr ) {
     for ( Mover other : others ) {
-      if ( this == other ) continue;
-        
+      if ( this == other ) continue; 
       float len = PVector.dist(pos,other.pos);
       if ( len > radius + other.radius ) continue;   // no collision
-      
+      collide = true; other.collide = true;
       PVector collisionVector = PVector.sub(other.pos,pos).normalize();
       // We need to adjust the positions of this and other to make sure they
       // are NOT inside each other. Find how deep they are, then using the 

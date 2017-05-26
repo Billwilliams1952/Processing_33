@@ -1,4 +1,19 @@
 /*
+    Steering Behaviors
+    
+    This program is free software: you can redistribute it and/or modify it under
+    the terms of the GNU General Public License as published by the Free Software
+    Foundation, either version 3 of the License, or (at your option) any later 
+    version. This program is distributed in the hope that it will be useful, but 
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more 
+    details. You should have received a copy of the GNU General Public License 
+    along with this program. If not, see http://www.gnu.org/licenses/.
+    
+    Bill Williams - 2017
+*/
+
+/*
     A Vehicle subclass that only moves if the mouse moves.
 */
 class MouseVehicle extends Mover {
@@ -24,6 +39,47 @@ class MouseVehicle extends Mover {
   }
 }
 
+class Collider extends Mover {
+  Collider ( float radius, color clr ) {
+    super(radius,clr);
+    vel = new PVector(random(-10,10),random(-10,10));
+    mass = radius * 0.1;
+  }
+  
+  void Edges () {
+    if (pos.x > width-radius) {
+      pos.x = width-radius;
+      vel.x *= -1;
+    } else if (pos.x < radius) {
+      pos.x = radius;
+      vel.x *= -1;
+    } else if (pos.y > height -radius) {
+      pos.y = height-radius;
+      vel.y *= -1;
+    } else if (pos.y < radius) {
+      pos.y = radius;
+      vel.y *= -1;
+    }
+  }
+  
+  void Show() {
+    color fullClr = SetAlpha(clr, 255);
+    stroke(255);
+    if ( collide ) fill(fullClr);
+    else           fill(clr);
+    pushMatrix();
+      translate(pos.x,pos.y);
+      rotate(vel.heading());
+      ellipse(0, 0, radius*2, radius*2);
+      if ( SHOW_VECTORS ) {
+        fill(fullClr);
+        stroke(fullClr);
+        SimpleArrow(vel.mag()*10);
+      }
+    popMatrix();
+  }
+}
+
 class Follower extends Mover {
   Follower ( int radius, color clr ) {
     super(radius,clr); 
@@ -32,28 +88,10 @@ class Follower extends Mover {
   void Update () {
     if ( ! DO_UPDATES ) return;
     vel.add(acc);
-    if ( vel.mag() < 5 ) vel.setMag(5);
+    if ( vel.mag() < 3 ) vel.setMag(3);
     pos.add(vel);
     acc.set(0,0);
   }
-
-  void Show () {
-    pushMatrix();
-      // Drawing vehicle and collision graphics relative to its position
-      translate(pos.x,pos.y);
-      rotate(vel.heading());
-      
-      stroke(255);
-      strokeWeight(1);
-      fill(clr);   
-      beginShape();
-        vertex(-radius,-radius);
-        vertex(-radius,radius); 
-        vertex(radius*2,0);
-      endShape(CLOSE);      
-    popMatrix();  
-  }
-  
 }
 
 class Target extends Mover {
@@ -128,6 +166,10 @@ class Obstacle extends Mover {
   float angle = random(TWO_PI); 
   float rotationRate = random(-0.02, 0.02);
   
+  Obstacle () {
+    this(floor(random(5,30)),color(255,0,0,200));
+  }
+  
   Obstacle ( float x, float y, int radius, color clr ) {
     this(radius,clr);
     pos.x = this.x = x; pos.y = this.y = y;
@@ -143,15 +185,17 @@ class Obstacle extends Mover {
     if ( numPts % 2 != 0 ) numPts++;    // an even number of points
     float inc = TWO_PI / numPts;
     float off = 0.1;
+    float scl = radius / 30.0;
     for ( float rads = 0; rads < TWO_PI; rads += inc ) {
       // Add Perlin noise
-      float val = radius + random(-10,10) * noise(off);
+      float val = radius + scl*random(-10,10) * noise(off);
       off += 0.5;
       PVector v = new PVector(val * cos(rads),val * sin(rads));
       pts.add(v);
     }
   }
   
+  // Override for some hard coded values for the parameters
   void Separation ( ArrayList<Mover> othersToAvoid ) {
     Separation ( othersToAvoid, radius*2, 3, 0.25 );   
   }
@@ -160,15 +204,16 @@ class Obstacle extends Mover {
     if ( ! DO_UPDATES ) return;
     if ( moves )
       super.Update();
-    else 
+    else // Is this really needed ?
       pos.set(x,y); 
   }
   
   void Show () {
     stroke(255);
+    strokeWeight(1);
     fill(clr);
+    angle += rotationRate;
     pushMatrix();
-      angle += rotationRate;
       translate(pos.x,pos.y);
       rotate(angle);
       beginShape();
@@ -203,6 +248,7 @@ class Avoider extends Mover {
   }
 
   void Show () {
+    super.Show();
     pushMatrix();
       // Drawing vehicle and collision graphics relative to its position
       translate(pos.x,pos.y);
@@ -212,16 +258,7 @@ class Avoider extends Mover {
         noStroke();
         fill(255,255,255,25);
         rect(-radius,-radius,control.GetValue(),2*radius);
-      }
-      
-      stroke(255);
-      strokeWeight(1);
-      fill(clr);   
-      beginShape();
-        vertex(-radius,-radius);
-        vertex(-radius,radius); 
-        vertex(radius*2,0);
-      endShape(CLOSE);      
+      }     
     popMatrix();  
   }
 }
@@ -241,21 +278,6 @@ class Wanderer extends Mover {
     if ( ! DO_UPDATES ) return;  
     super.Update();
     //MoverBase.DrawForceVector ( pos, vel, 6.0, color(0,255,0) );
-  }
-  
-  void Show() {    
-    pushMatrix();
-      translate(pos.x,pos.y);
-      rotate(vel.heading());
-      stroke(255);
-      strokeWeight(1);
-      fill(clr);   
-      beginShape();
-        vertex(-radius,-radius);
-        vertex(-radius,radius); 
-        vertex(radius*2,0);
-      endShape(CLOSE);      
-    popMatrix(); 
   }
   
   void Wander ( ) {
@@ -285,7 +307,7 @@ class BadGuy extends Mover {
   }
   
   BadGuy () {
-    super(15,color(128,0,128,150));
+    super(floor(random(15,40)),color(0,0,255,120));
   }
   
   void Update () {
@@ -312,6 +334,7 @@ class BadGuy extends Mover {
     pushMatrix();
       translate(pos.x,pos.y);
       stroke(255);
+      strokeWeight(1);
       fill(clr);
       rotate(vel.heading());
       arc(0,0,radius,radius,MOUTH_START-mouthSize,MOUTH_STOP+mouthSize,PIE); 

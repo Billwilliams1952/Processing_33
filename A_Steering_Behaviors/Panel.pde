@@ -1,3 +1,17 @@
+/*
+    Steering Behaviors
+    
+    This program is free software: you can redistribute it and/or modify it under
+    the terms of the GNU General Public License as published by the Free Software
+    Foundation, either version 3 of the License, or (at your option) any later 
+    version. This program is distributed in the hope that it will be useful, but 
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or 
+    FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more 
+    details. You should have received a copy of the GNU General Public License 
+    along with this program. If not, see http://www.gnu.org/licenses/.
+    
+    Bill Williams - 2017
+*/
 
 // Hack to allow me to declare static variables that I can change
 public static class BasePanelControl {
@@ -16,7 +30,8 @@ class PanelControl extends BasePanelControl {
   protected boolean   mousePress;               // Is the Mouse pressed while over control?
   protected float     value;                    // The current value of this control
   protected float     minValue, maxValue, lastValue, defaultValue;  // Valid values and default
-  protected PVector   mousePosRelToPanel;       // Relative to panel!! 
+  protected PVector   mousePosRelToPanel;       // Relative to panel!!
+  protected String    hintMsg = "";
   
   // Override everything
   PanelControl() {
@@ -25,7 +40,7 @@ class PanelControl extends BasePanelControl {
   // These may be overridden
   void SetText ( String text ) { this.text = text; }
   float GetValue () { return value; }
-  int GetIntegerValue () { return round(value); }
+  int GetIntegerValue () { return int(value); }
   boolean GetBooleanValue () { return value > 0; }
   void SetValue ( float value ) { 
     this.value = constrain(value,minValue,maxValue); 
@@ -35,6 +50,7 @@ class PanelControl extends BasePanelControl {
     this.value = constrain(this.value,minValue,maxValue); 
   }
   void SetBooleanValue ( boolean value ) { this.value = value ? 1 : 0; }
+  void ToggleBooleanValue ( ) { value = value > 0 ? 0 : 1; }
   void SetDefaultValue ( float value ) { defaultValue = value; }
   void ResetToDefaultValue () { value = defaultValue; }
   void SetMousePosition ( PVector childPanelPos ) {
@@ -45,6 +61,7 @@ class PanelControl extends BasePanelControl {
                   mousePosRelToPanel.x <= ctrlX + ctrlW &&
                   mousePosRelToPanel.y >= ctrlY && 
                   mousePosRelToPanel.y <= ctrlY + ctrlH; 
+    if ( overControl ) hintMessage = hintMsg;
     return overControl; }
   // MUST declare
   boolean Update ( PVector panelPos ) { return false; } // ALWAYS override
@@ -55,9 +72,8 @@ class PanelControl extends BasePanelControl {
 class HScrollbar extends PanelControl {
   private static final int SLIDER_HEIGHT = 18;
   private static final int SLIDER_WIDTH = 10;
-  private static final int ACCEL_FACTOR = 3; 
-  public  static final int DISPLAY_INT = 0x1;
-  public  static final int DISPLAY_FLOAT = 0x2;
+  private static final int ACCEL_FACTOR = 1;   // Anything greater causes problems
+                                               // at limits of the slider
   public  float ScaleFactor = 1;
   
   private float spos, newspos;      // position of slider, and its new position
@@ -66,7 +82,7 @@ class HScrollbar extends PanelControl {
   private float sliderStart;        
 
   HScrollbar ( int ID, String name, float min, float max, float x, float y ) {
-    this(ID,name,min,max,x,y,-1);
+    this(ID,name,min,max,x,y,-1);    // ?? No access to panelwidth
   }
 
   HScrollbar ( int ID, String name, float min, float max,  
@@ -139,11 +155,11 @@ class HScrollbar extends PanelControl {
       stroke(255);
     else
       noStroke();
-    fill(204);
+    fill(disabled ? 128 : 204);
     rect(ctrlX , sliderStart + ScaleFactor*SLIDER_HEIGHT / 2, ctrlW, ScaleFactor*4); 
     // Slider handle
     fill(mousePress && ! disabled ? color(255,255,150) : color(208,197,232));
-    stroke(255);
+    stroke(disabled ? 128 : 255);
     rect(spos, sliderStart, ScaleFactor*SLIDER_WIDTH, ScaleFactor*SLIDER_HEIGHT, 5);
     // Slider name and current value
     fill(disabled ? 150 : 255);
@@ -153,7 +169,7 @@ class HScrollbar extends PanelControl {
     text(text,ctrlX,ctrlY);
     textAlign(RIGHT,TOP);
     if ( numDecimals == 0 )
-      text(nfc(round(value)),ctrlX+ctrlW,ctrlY);
+      text(nfc(int(value)),ctrlX+ctrlW,ctrlY);
     else 
       text(nfc(value,numDecimals),ctrlX+ctrlW,ctrlY);
     textFont(BasePanel.font);
@@ -223,10 +239,10 @@ class TextString extends PanelControl {
   private color   normalClr;
   private int     sizeOfText;
   
-  TextString ( int ID, String text, PVector loc, color normalClr, int textSize ) {
+  TextString ( int ID, String text, float x, float y, color normalClr, int textSize ) {
     this.ID = ID;
     this.text = text;
-    ctrlX = loc.x; ctrlY = loc.y; 
+    ctrlX = x; ctrlY = y; 
     this.normalClr = normalClr;
     sizeOfText = textSize;
     value = 0;
@@ -243,7 +259,7 @@ class TextString extends PanelControl {
       translate(ctrlX,ctrlY);
       fill(normalClr);
       textFont(BasePanel.fontBold);
-      textSize(BasePanelControl.sizeOfText);
+      textSize(sizeOfText);
       textAlign(LEFT,TOP);
       text(this.text,0,0);
       //noClip();
@@ -261,6 +277,9 @@ public static class BasePanel {
   public static int     showPanels = DO_NOTHING_ON_PANELS,
                         DEFAULT_FONT_SIZE = 12, TAB_FONT_SIZE = 16, TITLE_FONT_SIZE = 16;
   public static PFont   font = null, fontBold = null;
+  public static String  movePanelHint = "Click+Drag to move";
+  public static String  rollUpHint = "Toggle panel rollup";
+  public static String  hideHint = "Hide the window ('L' key to show)";
   
   public static boolean CreatePanelFonts ( PApplet p, String fontName, String fontBoldName ) {
     BasePanel.font = p.createFont(fontName, BasePanel.DEFAULT_FONT_SIZE);
@@ -368,13 +387,18 @@ public class Panel extends BasePanel {
     controls.add(new Button(ID,text_, x, y, normalClr_, pressedClr_ ));
   }
   
-  void AddTextString ( int ID, String text_, PVector loc_, color normalClr_, int textSize_ ) {
-    controls.add(new TextString(ID,text_, loc_, normalClr_, textSize_ ));
+  void AddTextString ( int ID, String text_,float x, float y, color normalClr_, int textSize_ ) {
+    controls.add(new TextString(ID,text_, x, y, normalClr_, textSize_ ));
   }
   
   float AddScrollbar ( int ID, String name, float min, float max, float xLoc, float yLoc ) {
-    //if ( scrollWidth == -1 ) scrollWidth = minWidth - 4 * PADDING;
     HScrollbar sb = new HScrollbar(ID,name, min, max, xLoc, yLoc, minWidth - 4 * PADDING);
+    controls.add(sb);
+    return sb.GetSliderHeight();
+  }
+  
+  float AddScrollbar ( int ID, String name, float min, float max, float xLoc, float yLoc, float w ) {
+    HScrollbar sb = new HScrollbar(ID,name, min, max, xLoc, yLoc, (int)w );
     controls.add(sb);
     return sb.GetSliderHeight();
   }
@@ -389,18 +413,28 @@ public class Panel extends BasePanel {
     }
     if ( ! keyPressed )
       keyPress = false;
-  }
+  } 
  
   boolean InTitlebar() {
-    return mouseY >= loc.y && mouseY <= loc.y + TITLEBAR_HEIGHT;
+    boolean inside = mouseY >= loc.y && mouseY <= loc.y + TITLEBAR_HEIGHT;
+    if ( inside ) hintMessage = movePanelHint;
+    return inside;
   }
-  
+
   boolean OnRollup() {
-    return mouseX >= loc.x + minWidth-30 && mouseX <= loc.x + minWidth - 20 && InTitlebar();
+    boolean onRollup = mouseX >= loc.x + minWidth-30 && 
+                       mouseX <= loc.x + minWidth - 20 && InTitlebar();
+    if ( onRollup ) hintMessage = rollUpHint;
+    else if ( InTitlebar() ) hintMessage = movePanelHint;
+    return onRollup;
   }
-  
+
   boolean OnHidePanel() {
-    return mouseX >= loc.x + minWidth-15 && mouseX <= loc.x + minWidth && InTitlebar();
+    boolean onHide = mouseX >= loc.x + minWidth-15 && 
+                     mouseX <= loc.x + minWidth && InTitlebar();
+    if ( onHide ) hintMessage = hideHint;
+    else if ( InTitlebar() ) hintMessage = movePanelHint;
+    return onHide;
   }
   
   boolean OnDraggingSection() {
@@ -465,8 +499,7 @@ public class Panel extends BasePanel {
   
   void Disable ( int ID, boolean disable ) {
     PanelControl control = GetChild(ID);
-    if ( control != null )
-      control.disabled = disable;
+    if ( control != null ) control.disabled = disable;
   }  
   
   float GetValue ( int ID ) {
@@ -484,16 +517,19 @@ public class Panel extends BasePanel {
     return control != null ? control.GetBooleanValue() : false;
   }
   
+  void SetHint ( int ID, String msg ) {
+    PanelControl control = GetChild(ID);
+    if ( control != null ) control.hintMsg = msg;    
+  }
+  
   void SetValue ( int ID, float value ) {
     PanelControl control = GetChild(ID);
-    if ( control != null )
-      control.SetValue(value);
+    if ( control != null ) control.SetValue(value);
   }
   
   void SetRelativeValue ( int ID, float value ) {
     PanelControl control = GetChild(ID);
-    if ( control != null )
-      control.SetRelativeValue(value);    
+    if ( control != null ) control.SetRelativeValue(value);    
   }
   
   void SetValue ( int ID, float value, int numDecimals ) {
@@ -506,20 +542,22 @@ public class Panel extends BasePanel {
   
   void SetBooleanValue ( int ID, boolean value ) {
     PanelControl control = GetChild(ID);
-    if ( control != null )
-      control.SetBooleanValue(value);
+    if ( control != null ) control.SetBooleanValue(value);
+  }
+  
+  void ToggleBooleanValue ( int ID ) {
+    PanelControl control = GetChild(ID);
+    if ( control != null ) control.ToggleBooleanValue();
   }
   
   void SetText ( int ID, String text ) {
     PanelControl control = GetChild(ID);
-    if ( control != null )
-      control.SetText(text);
+    if ( control != null ) control.SetText(text);
   }
   
   PanelControl GetChild ( int ID ) {
     for ( PanelControl control : controls ) {
-      if ( control.ID == ID )
-        return control;
+      if ( control.ID == ID ) return control;
     }
     println("ID " + ID + " NOT FOUND!");
     return null;
@@ -530,7 +568,7 @@ public class Panel extends BasePanel {
     fill(clr);
     stroke(255);
     rectMode(CORNER);
-    rect(0,0,minWidth,rolledUp ? TITLEBAR_HEIGHT : minHeight,5);
+    rect(0,0,minWidth == -1 ? width : minWidth,rolledUp ? TITLEBAR_HEIGHT : minHeight,5);
     // Now draw Tabs across top of window
     for ( Tab tab : tabs ) {
       
@@ -566,6 +604,7 @@ public class Panel extends BasePanel {
   }
   
   void draw () {           // Registered callback mthod
+    strokeWeight(1);
     UpdateKeypress();      // In case the panel is not visible
     
     if ( BasePanel.font == null || BasePanel.fontBold == null ) {
@@ -579,10 +618,11 @@ public class Panel extends BasePanel {
     
     boolean handled = false;
     
-    if ( ! rolledUp ) {          // Only check controls if not rolled up
+    if ( ! rolledUp && ! dragging ) {          // Only check controls if not rolled up
       PVector childPanelPos = PVector.add(loc,new PVector(0,TITLEBAR_HEIGHT+tabHeight));
       
       for ( PanelControl control : controls ) {
+        if ( control.disabled ) continue;
         if ( PanelControl.activePanelControl == null || 
              PanelControl.activePanelControl == control ) {
           handled = control.Update(childPanelPos);

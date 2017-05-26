@@ -114,11 +114,15 @@ class HScrollbar extends PanelControl {
     if ( disabled ) return false;      // Nothing to see here... move on   
     SetMousePosition(panelPos);
     
-    if ( OverControl() && MousePressed() )
+    if ( OverControl() && MousePressed() ) {
       mousePress = true;
+      cam.setActive(false);
+    }
 
-    if ( ! mousePressed )
+    if ( ! mousePressed ) {
       mousePress = false;
+      cam.setActive(true);
+    }
 
     if ( mousePress )
       newspos = constrain(mousePosRelToPanel.x-ScaleFactor*SLIDER_WIDTH/2, sposMin, sposMax);
@@ -208,10 +212,13 @@ class Button extends PanelControl {
       value += 1;
       if ( value > maxValue )
         value = minValue;
+      cam.setActive(false);
     }
 
-    if ( ! mousePressed )
+    if ( ! mousePressed ) {
       mousePress = false;
+      cam.setActive(true);
+    }
      
     activePanelControl = mousePress ? this : null;
     return mousePress;
@@ -433,7 +440,7 @@ public class Panel extends BasePanel {
   boolean OnPanel () {
     int size = rolledUp ? TITLEBAR_HEIGHT : minHeight;
     return mouseX >= loc.x && mouseX <= loc.x + minWidth &&
-           mouseY >= loc.y && mouseY <= loc.x + size;
+           mouseY >= loc.y && mouseY <= loc.y + size;
   }
   
   void ConstrainToWindow() {
@@ -458,6 +465,7 @@ public class Panel extends BasePanel {
       if ( ! OnPanel() ) return;
       activePanel = this;
       mousePress = true;      // This avoids multiple mousePressed calls
+      cam.setActive(false);
       if ( OnHidePanel() ) {
         showPanel = false;
         activePanel = null;
@@ -473,6 +481,7 @@ public class Panel extends BasePanel {
       }
     }
     if ( ! mousePressed ) {
+      cam.setActive(true);
       mousePress = false;
       dragging = false;
       cursor(ARROW);
@@ -565,10 +574,9 @@ public class Panel extends BasePanel {
     fill(255);
     textSize(BasePanel.TITLE_FONT_SIZE);
     // Clip text if too big for title area
-    // Why doesn't clip() recognize the translate?
-    clip(loc.x,loc.y,minWidth-35,15);
+    //clip(loc.x,loc.y,minWidth-35,15);
     text(panelName,5,15);
-    noClip();
+    //noClip();
     pushMatrix();    // Close 'X'
       strokeWeight(OnHidePanel() ? 2 : 1);
       translate(minWidth-10,9);
@@ -604,42 +612,47 @@ public class Panel extends BasePanel {
     }
     
     boolean handled = false;
-    
-    if ( ! rolledUp ) {          // Only check controls if not rolled up
-      PVector childPanelPos = PVector.add(loc,new PVector(0,TITLEBAR_HEIGHT+tabHeight));
-      
-      for ( PanelControl control : controls ) {
-        if ( PanelControl.activePanelControl == null || 
-             PanelControl.activePanelControl == control ) {
-          handled = control.Update(childPanelPos);
-          if ( handled ) break;
-        }
-      }
-    }
-
-    if ( ! handled )
-      Update();              // Now check for rollup, hiding, and moving
-
+   
     cam.beginHUD();
-    // Display the panel based on it's status
-    ortho();
-    pushMatrix(); 
-      translate(loc.x,loc.y,0);      
-      DrawPanel();    // Including Tabs
+    
+      ortho(0,width,-height,0);  // now in standard Processing coordinates
       
-      // Draw controls if visible
-      if ( ! rolledUp ) {
-        line(0,TITLEBAR_HEIGHT,minWidth,TITLEBAR_HEIGHT);
-        // Now translate past this Titlebar and Tabs
-        translate(PADDING,TITLEBAR_HEIGHT+PADDING+tabHeight); 
-        // Now loop through all controls. Clip anything outside of panel area.
-        clip(loc.x,loc.y+tabHeight,minWidth,minHeight);
-        for ( PanelControl control : controls )
-          control.Show();
-        noClip();
-      }
-    popMatrix();
-    perspective(fov,aspect,cameraZ/10.0,cameraZ*10.0);
+      pushMatrix();  
+        resetMatrix();    // Consistent XYZ frame to frame
+        if ( ! rolledUp && ! dragging) { // Only check controls if not rolled up
+          PVector childPanelPos = PVector.add(loc,new PVector(0,TITLEBAR_HEIGHT+tabHeight));
+          
+          for ( PanelControl control : controls ) {
+            if ( PanelControl.activePanelControl == null || 
+                 PanelControl.activePanelControl == control ) {
+              handled = control.Update(childPanelPos);
+              if ( handled ) break;
+            }
+          }
+        }
+    
+        if ( ! handled )
+          Update();              // Now check for rollup, hiding, and moving        
+    
+        // Display the panel based on it's status
+        translate(loc.x,loc.y); 
+        DrawPanel();    // Including Tabs
+        
+        // Draw controls if visible
+        if ( ! rolledUp ) {
+          line(0,TITLEBAR_HEIGHT,minWidth,TITLEBAR_HEIGHT);
+          // Now translate past this Titlebar and Tabs
+          translate(PADDING,TITLEBAR_HEIGHT+PADDING+tabHeight); 
+          // Now loop through all controls. Clip anything outside of panel area.
+          //clip(loc.x,loc.y+tabHeight,minWidth,minHeight);
+          for ( PanelControl control : controls )
+            control.Show();
+          //noClip();
+        }   
+      popMatrix();
+      
+      perspective(); //fov,aspect,cameraZ/10.0,cameraZ*10.0);
+    
     cam.endHUD();
   }
   /// End of Class 
